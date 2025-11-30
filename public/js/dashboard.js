@@ -1,127 +1,130 @@
+// Seletores principais
 const leaveBtn = document.querySelector(".leave-btn");
 const createBtn = document.querySelector(".create-room");
 const seeRoomBtn = document.querySelector(".see-room");
-const roomList = document.getElementById('room-list');
-const modal = document.getElementById("modal");
-const closeBtn = document.querySelector(".close");
-const confirmBtn = document.getElementById("confirmBtn");
-const cancelBtn = document.getElementById("cancelBtn");
+const roomList = document.getElementById("room-list");
+const roomInput = document.querySelector(".roomInput");
+const errorText = document.querySelector(".error-text");
 
-leaveBtn.addEventListener("click", (e) => {
-  e.preventDefault();
-  sessionStorage.removeItem("auth-token");
-  window.location.href = "login.html";
-});
-
-createBtn.addEventListener("click", function () {
-  const roomName = document.getElementById("message-input").value;
-  console.log("Room Name:", roomName);
-  if (roomName === "") {
-    console.log("room name is required");
-    document.querySelector(
-      ".error-text"
-    ).innerHTML = `<p>Room name is required!</p>`;
-  } else {
-    axios
-      .post(
-        "/api/chat",
-        {
-          name: roomName,
-        },
-        {
-          headers: {
-            Authorization: `BEARER ${sessionStorage.getItem("auth-token")}`,
-          },
-        }
-      )
-      .then((response) => {
-        console.log(response.data);
-        alert("New room created");
-      })
-      .catch((error) => {
-        document.querySelector(
-          ".error-text"
-        ).innerHTML = `<p>${error.response.data.error}</p>`;
-      });
-    // modal.style.display = "none";
-    document.getElementById("message-input").value = "";
-  }
-});
-
-seeRoomBtn.addEventListener('click', async () => {
-    const availableRooms = await axios
-    .get(
-      "/api/chat",
-      {
-        headers: {
-          Authorization: `BEARER ${sessionStorage.getItem("auth-token")}`,
-        },
-      }
-    )
-    .then((response) => {
-      console.log('rooms',response.data);
-      // alert("New room created");
-      return response.data;
-    })
-    .catch((error) => {
-      document.querySelector(
-        ".available-error-text"
-      ).innerHTML = `<p>${error.response.data.error}</p>`;
-    });
-
-
-
-    // availableRooms.forEach(room => {
-    //     const li = document.createElement('li');
-    //     li.textContent = room.name;
-    //     li.addEventListener('click', () => {
-    //         handleRoomClick(room);
-    //     });
-    //     roomList.appendChild(li);
-    // });
-
-  // ------------------------------------------------------------------ start
-  const chatRoomList = document.querySelector('.chatRoomList');
-
-  if (!availableRooms.length) {
-    document.querySelector('.roomListTitle').textContent = 'No Room Available!';
-    document.querySelector('.roomListTitle').style.display = 'block';
-    chatRoomList.querySelector('ul').style.display = 'none';
-  } else {
-    document.querySelector('.roomListTitle').style.display = 'block';
-    chatRoomList.querySelector('ul').style.display = 'block';
-    document.getElementById('room-list').innerHTML = '';
-
-    availableRooms.forEach(room => {
-      const li = document.createElement('li');
-      li.textContent = room.name;
-      li.addEventListener('click', () => {
-        handleRoomClick(room);
-      });
-      roomList.appendChild(li);
-    });
-  }
-
-  // ------------------------------------------------------------------ end
-    
-});
-
-const handleRoomClick = async (room) => {
-    console.log('Room Clicked');
-    window.location.href = `chat.html?roomId=${room.id}&roomName=${room.name}`
+// Utilitário: pegar token
+function getAuthToken() {
+  return sessionStorage.getItem("auth-token");
 }
 
-//   createBtn.addEventListener("click", (e) => {
-//     e.preventDefault();
-//     modal.style.display = "block";
-//   });
+// Se não tiver token, volta pro login
+if (!getAuthToken()) {
+  window.location.href = "index.html";
+}
 
-//   closeBtn.addEventListener("click", function() {
-//       document.getElementById('roomNameInput').value='';
-//       modal.style.display = "none";
-//     });
+// Botão "Sair"
+if (leaveBtn) {
+  leaveBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    sessionStorage.removeItem("auth-token");
+    window.location.href = "index.html";
+  });
+}
 
-//   cancelBtn.addEventListener("click", function() {
-//     document.getElementById('roomNameInput').value='';
-//     modal.style.display = "none";
-//   });
+// Função para renderizar lista de salas
+function renderRooms(rooms) {
+  if (!roomList) return;
+
+  roomList.innerHTML = "";
+
+  if (!rooms || rooms.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "Nenhuma sala criada ainda.";
+    roomList.appendChild(li);
+    return;
+  }
+
+  rooms.forEach((room) => {
+    const li = document.createElement("li");
+
+    const span = document.createElement("span");
+    span.textContent = room.name || `Sala ${room.id}`;
+
+    const btn = document.createElement("button");
+    btn.textContent = "Entrar";
+    btn.addEventListener("click", () => {
+      const params = new URLSearchParams({
+        roomId: room.id,
+        roomName: room.name || `Sala ${room.id}`,
+      });
+      window.location.href = `chat.html?${params.toString()}`;
+    });
+
+    li.appendChild(span);
+    li.appendChild(btn);
+    roomList.appendChild(li);
+  });
+}
+
+// Função para buscar salas no backend
+async function fetchRooms() {
+  if (!roomList) return;
+  if (errorText) errorText.textContent = "";
+
+  try {
+    const response = await axios.get("/api/chat", {
+      headers: {
+        Authorization: `BEARER ${getAuthToken()}`,
+      },
+    });
+
+    console.log("Salas recebidas:", response.data);
+    renderRooms(response.data);
+  } catch (error) {
+    console.error("Erro ao buscar salas:", error);
+    if (errorText) {
+      errorText.textContent = "Erro ao carregar salas.";
+    }
+  }
+}
+
+// Botão "Criar sala"
+if (createBtn) {
+  createBtn.addEventListener("click", async () => {
+    const roomName = roomInput ? roomInput.value.trim() : "";
+
+    if (!roomName) {
+      if (errorText) {
+        errorText.textContent = "Digite o nome da sala.";
+      }
+      return;
+    }
+
+    if (errorText) errorText.textContent = "";
+
+    try {
+      const response = await axios.post(
+        "/api/chat",
+        { name: roomName },
+        {
+          headers: {
+            Authorization: `BEARER ${getAuthToken()}`,
+          },
+        }
+      );
+
+      console.log("Sala criada:", response.data);
+      roomInput.value = "";
+      await fetchRooms();
+    } catch (error) {
+      console.error("Erro ao criar sala:", error);
+      if (errorText) {
+        errorText.textContent = "Erro ao criar sala.";
+      }
+    }
+  });
+}
+
+// Botão "Atualizar lista de salas"
+if (seeRoomBtn) {
+  seeRoomBtn.addEventListener("click", async () => {
+    await fetchRooms();
+  });
+}
+
+// Buscar salas automaticamente ao carregar o dashboard
+fetchRooms();

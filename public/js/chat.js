@@ -13,6 +13,14 @@ let searchParams = new URLSearchParams(window.location.search);
 let number = searchParams.get("roomId");
 let roomName = searchParams.get("roomName");
 
+const logoutBtn = document.querySelector("#logoutBtn");
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", () => {
+    sessionStorage.removeItem("auth-token");
+    window.location.href = "index.html";
+  });
+}
+
 const fetchMessages = async (number) => {
   try {
     const response = await axios.get(
@@ -31,17 +39,37 @@ const fetchMessages = async (number) => {
 };
 
 const $messageForm = document.querySelector("#messageForm");
-const $messaageFormInput = $messageForm.querySelector("input");
-const $messageFormButton = $messageForm.querySelector("button");
 const $messages = document.querySelector("#messages");
 const $sidebar = document.querySelector("#sidebar");
 
+let $messaageFormInput;
+let $messageFormButton;
+
+if ($messageForm) {
+  $messaageFormInput = $messageForm.querySelector("input");
+  $messageFormButton = $messageForm.querySelector("button");
+
+  $messageForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    console.log("------submitting-------");
+
+    const message = e.target.elements.message.value.trim();
+    if (!message) return;
+
+    socket.emit("sendMessage", { roomName, message });
+    $messaageFormInput.value = "";
+  });
+}
+
+
 // Template
 const messageTemplate = document.querySelector("#message-template").innerHTML;
-const locationMessageTemplate = document.querySelector(
-  "#location-message-template"
-).innerHTML;
+// Template de localização removido (não usamos mais location)
+// const locationMessageTemplate = document.querySelector(
+//   "#location-message-template"
+// ).innerHTML;
 const sidebarTemplate = document.querySelector("#sidebar-template").innerHTML;
+
 
 async function useData(number) {
   try {
@@ -118,17 +146,6 @@ const autoscroll = () => {
   }
 };
 
-$messageForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  console.log("------submitting-------")
-  // $messageFormButton.setAttribute('disabled', 'disabled');
-
-  const message = e.target.elements.message.value;
-
-  socket.emit("sendMessage", { roomName, message });
-  $messaageFormInput.value = "";
-  // useData(number);
-});
 
 socket.on("connect", () => {
   console.log("Connected to server....");
